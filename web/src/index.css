@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/* A SOC console is looked at for hours in a dim room; dark is the default,
+   not a preference toggle. One cool grey family, one accent, and the three
+   verdict colours reserved for verdicts and severity. */
+@theme {
+  --color-ink: #0b0f14;
+  --color-panel: #121821;
+  --color-raised: #19212c;
+  --color-edge: #232d3a;
+  --color-dim: #8c9aad;
+  --color-text: #e7ecf3;
+  --color-accent: #6cb6ff;
+
+  --color-malicious: #f2684b;
+  --color-suspicious: #e5a646;
+  --color-benign: #45b584;
+  --color-unknown: #8493a8;
+
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Code", "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  background: var(--color-ink);
+  color: var(--color-text);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* A faint glow behind the header so the page is not one flat slab. */
+  background-image: radial-gradient(60rem 24rem at 20% -8rem, rgb(108 182 255 / 0.07), transparent 70%);
+  background-repeat: no-repeat;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-edge bg-raised px-3 text-sm font-medium text-text transition duration-150 hover:border-dim/50 hover:bg-edge active:translate-y-px disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-accent bg-accent text-ink hover:border-accent hover:bg-accent/85;
+  }
+  .btn-quiet {
+    @apply border-transparent bg-transparent text-dim hover:border-edge hover:bg-raised hover:text-text;
+  }
+  .field {
+    @apply min-h-9 rounded-md border border-edge bg-panel px-3 text-sm text-text transition duration-150 placeholder:text-dim/60 hover:border-dim/40 focus:border-accent focus:outline-none;
+  }
+  .label {
+    @apply text-[11px] font-medium tracking-wide text-dim;
+  }
+  .skeleton {
+    @apply animate-pulse rounded bg-raised;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.rise {
+  animation: rise 0.28s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

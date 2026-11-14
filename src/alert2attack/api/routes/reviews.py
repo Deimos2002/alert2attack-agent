@@ -1,0 +1,78 @@
+"""Analyst reviews of case files (append-only; see ``alert2attack.api.reviews``)."""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from alert2attack.api.auth import Operator, require_operator
+from alert2attack.api.deps import JobStoreDep, ReviewStoreDep
+from alert2attack.api.reviews import (
+    EvalCaseCandidate,
+    Review,
+    ReviewRequest,
+    build_review,
+    export_candidates,
+)
+from alert2attack.api.routes.investigations import get_job_or_404
+
+router = APIRouter(dependencies=[Depends(require_operator)])
+
+
+@router.post("/investigations/{job_id}/review", response_model=Review, status_code=201)
+def add_review(
+    job_id: str,
+    body: ReviewRequest,
+    store: JobStoreDep,
+    reviews: ReviewStoreDep,
+    caller: Annotated[Operator | None, Depends(require_operator)] = None,
+) -> Review:
+    """Record agreement or disagreement with a case file.
+
+    Never mutates the case file: a review is an observation about what the
+    agent said on that run, and the run's record stays as it was.
+    """
+    job = get_job_or_404(store, job_id)
+    if job.result is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"investigation is {job.status}; there is no case file to review",
+        )
+    if not body.agrees and body.corrected_verdict is None:
+        raise HTTPException(
+            status_code=422,
+            detail="a disagreement needs a corrected_verdict to be actionable",
+        )
+    review = build_review(
+        job_id=job_id,
+        scenario_id=job.scenario_id,
+        agent_verdict=str(job.result.get("case_file", {}).get("verdict", "unknown")),
+        request=body,
+        reviewer=caller.username if caller else "anonymous",
+    )
+    reviews.add(review)
+    return review
+
+
+@router.get("/reviews", response_model=list[Review])
+def list_reviews(
+    reviews: ReviewStoreDep,
+    scenario_id: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[Review]:
+    return reviews.list(scenario_id=scenario_id, limit=limit)
+
+
+@router.get("/reviews/export", response_model=list[EvalCaseCandidate])
+def export_reviews(
+    reviews: ReviewStoreDep,
+    limit: Annotated[int, Query(ge=1, le=500)] = 500,
+) -> list[EvalCaseCandidate]:
+    """Candidate eval cases for a human to curate.
+
+    Export rather than a direct write into the dev split: letting the
+    agent's own output become its answer key is the contamination the eval
+    protocol exists to prevent.
+    """
+    return export_candidates(reviews.list(limit=limit))
