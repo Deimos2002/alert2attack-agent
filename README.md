@@ -4,6 +4,8 @@ An investigation agent for endpoint security alerts. It takes one EDR alert and 
 
 It runs on a local 7B model. On held-out cases it reaches the right verdict on 9 of 10, up from 5 of 10 before the latest change, without ever recommending an action the answer key forbids.
 
+**[Live demo](https://alert2attack-demo.ashyisland-fb3eded8.italynorth.azurecontainerapps.io)**: open a case and press Run investigation. It runs on a hosted `gpt-5-mini` with technique grounding on, takes about a minute, and is capped at 20 live runs a day; past that it uses the scripted replay and says so. The first load can take 10 to 30 seconds while the container starts.
+
 Python, LangGraph, FastAPI, React and TypeScript · measured on [OTRF Security Datasets](https://github.com/OTRF/Security-Datasets) · [MIT](LICENSE)
 
 This README is organised around the decisions: what was built, why, and what each choice did to the numbers.
