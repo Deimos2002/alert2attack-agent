@@ -1,0 +1,440 @@
+{
+  "generated_at": "2026-11-24T21:30:11.462991+00:00",
+  "dataset_hash": "4e1963b3f04162ca",
+  "run": {
+    "experiment": "EXP-007 hosted model on the grounding test set",
+    "grounding": "on",
+    "model": "gpt-5-mini 2025-08-07",
+    "provider": "Azure OpenAI, DataZoneStandard (EU)",
+    "llm_timeout_s": 180,
+    "scenarios": "the same 10 test scenarios as 2026-11-13-grounding-test-on.json",
+    "dataset_hash_note": "hash covers the 10-scenario root used for this run, so it differs from the 28-scenario root of EXP-006; the scenario files are byte-identical copies",
+    "runs_per_arm": 1,
+    "command": "alert2attack eval run --arm agent-teacher --split test --root <10-scenario folder>"
+  },
+  "report": {
+    "arm": "agent-teacher",
+    "split": "test",
+    "n": 10,
+    "verdict_accuracy": 0.9,
+    "mean_verdict_cost": 0.3,
+    "mean_technique_f1": 0.45,
+    "mean_key_pid_recall": 1.0,
+    "mean_persistence_recall": 1.0,
+    "mean_citation_validity_pre": 1.0,
+    "mean_citation_validity_post": 1.0,
+    "mean_unsupported_claim_rate": 0.38865440115440114,
+    "action_safety_rate": 1.0,
+    "acceptable_action_rate": 0.9,
+    "mean_tool_calls": 12.7,
+    "mean_llm_calls": 10.9,
+    "budget_exhaustion_rate": 0.0,
+    "cases": [
+      {
+        "scenario_id": "otrf_auditpol_system_user_auditpolicy_modification",
+        "verdict_match": false,
+        "verdict_cost": 3,
+        "technique_precision": 0.0,
+        "technique_recall": 0.0,
+        "technique_f1": 0.0,
+        "root_hit": true,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 0.1111111111111111,
+        "action_safe": true,
+        "has_acceptable_action": true,
+        "tool_calls": 12,
+        "llm_calls": 10,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "not_enough_evidence",
+          "gold_verdict": "malicious",
+          "pre_repair_verdict": "not_enough_evidence",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            5624,
+            768
+          ],
+          "gold_key_pids": [
+            5624,
+            5624
+          ],
+          "gold_root_pid": 5624,
+          "pred_has_root_claim": true,
+          "budget_timed_out": false
+        }
+      },
+      {
+        "scenario_id": "otrf_cmd_dumping_ntds_dit_file_volume_shadow_copy_benign_lsass",
+        "verdict_match": true,
+        "verdict_cost": 0,
+        "technique_precision": 0.0,
+        "technique_recall": 0.0,
+        "technique_f1": 0.0,
+        "root_hit": false,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 1.0,
+        "action_safe": true,
+        "has_acceptable_action": false,
+        "tool_calls": 13,
+        "llm_calls": 11,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "likely_benign",
+          "gold_verdict": "likely_benign",
+          "pre_repair_verdict": "malicious",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            1244,
+            600,
+            520,
+            788,
+            832,
+            884,
+            948,
+            996,
+            336,
+            732,
+            676,
+            636,
+            624
+          ],
+          "gold_key_pids": [
+            1244
+          ],
+          "gold_root_pid": 1244,
+          "pred_has_root_claim": false,
+          "budget_timed_out": false
+        }
+      },
+      {
+        "scenario_id": "otrf_cmd_mshta_vbscript_execute_psh",
+        "verdict_match": true,
+        "verdict_cost": 0,
+        "technique_precision": 1.0,
+        "technique_recall": 1.0,
+        "technique_f1": 1.0,
+        "root_hit": true,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 0.125,
+        "action_safe": true,
+        "has_acceptable_action": true,
+        "tool_calls": 12,
+        "llm_calls": 13,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "malicious",
+          "gold_verdict": "malicious",
+          "pre_repair_verdict": "suspicious",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            10980,
+            5888
+          ],
+          "gold_key_pids": [
+            10980,
+            10980
+          ],
+          "gold_root_pid": 10980,
+          "pred_has_root_claim": true,
+          "budget_timed_out": false
+        }
+      },
+      {
+        "scenario_id": "otrf_cmd_mshta_vbscript_execute_psh_nee",
+        "verdict_match": true,
+        "verdict_cost": 0,
+        "technique_precision": 1.0,
+        "technique_recall": 1.0,
+        "technique_f1": 1.0,
+        "root_hit": true,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 0.1111111111111111,
+        "action_safe": true,
+        "has_acceptable_action": true,
+        "tool_calls": 10,
+        "llm_calls": 10,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "not_enough_evidence",
+          "gold_verdict": "not_enough_evidence",
+          "pre_repair_verdict": "malicious",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            10980,
+            5888
+          ],
+          "gold_key_pids": [
+            10980,
+            10980
+          ],
+          "gold_root_pid": 10980,
+          "pred_has_root_claim": true,
+          "budget_timed_out": false
+        }
+      },
+      {
+        "scenario_id": "otrf_cmd_sharpview_pcre_net",
+        "verdict_match": true,
+        "verdict_cost": 0,
+        "technique_precision": 1.0,
+        "technique_recall": 0.5,
+        "technique_f1": 0.6666666666666666,
+        "root_hit": true,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 0.09090909090909091,
+        "action_safe": true,
+        "has_acceptable_action": true,
+        "tool_calls": 13,
+        "llm_calls": 9,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "malicious",
+          "gold_verdict": "malicious",
+          "pre_repair_verdict": "malicious",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            3752,
+            7804
+          ],
+          "gold_key_pids": [
+            3752,
+            3752
+          ],
+          "gold_root_pid": 3752,
+          "pred_has_root_claim": true,
+          "budget_timed_out": false
+        }
+      },
+      {
+        "scenario_id": "otrf_cmd_userinitmprlogonscript_batch",
+        "verdict_match": true,
+        "verdict_cost": 0,
+        "technique_precision": 0.5,
+        "technique_recall": 1.0,
+        "technique_f1": 0.6666666666666666,
+        "root_hit": true,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 0.08333333333333333,
+        "action_safe": true,
+        "has_acceptable_action": true,
+        "tool_calls": 14,
+        "llm_calls": 12,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "malicious",
+          "gold_verdict": "malicious",
+          "pre_repair_verdict": "malicious",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            8684,
+            8836
+          ],
+          "gold_key_pids": [
+            8684,
+            8684
+          ],
+          "gold_root_pid": 8684,
+          "pred_has_root_claim": true,
+          "budget_timed_out": false
+        }
+      },
+      {
+        "scenario_id": "otrf_empire_dllinjection_loadlibrary_createremotethread_benign_lsass",
+        "verdict_match": true,
+        "verdict_cost": 0,
+        "technique_precision": 0.0,
+        "technique_recall": 0.0,
+        "technique_f1": 0.0,
+        "root_hit": false,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 1.0,
+        "action_safe": true,
+        "has_acceptable_action": true,
+        "tool_calls": 14,
+        "llm_calls": 9,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "likely_benign",
+          "gold_verdict": "likely_benign",
+          "pre_repair_verdict": "likely_benign",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            396,
+            740,
+            3284,
+            1056
+          ],
+          "gold_key_pids": [
+            396
+          ],
+          "gold_root_pid": 396,
+          "pred_has_root_claim": false,
+          "budget_timed_out": false
+        }
+      },
+      {
+        "scenario_id": "otrf_empire_launcher_vbs",
+        "verdict_match": true,
+        "verdict_cost": 0,
+        "technique_precision": 1.0,
+        "technique_recall": 0.3333333333333333,
+        "technique_f1": 0.5,
+        "root_hit": true,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 0.14285714285714285,
+        "action_safe": true,
+        "has_acceptable_action": true,
+        "tool_calls": 12,
+        "llm_calls": 12,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "malicious",
+          "gold_verdict": "malicious",
+          "pre_repair_verdict": "malicious",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            2316,
+            7700,
+            2440
+          ],
+          "gold_key_pids": [
+            2316,
+            2316,
+            7700
+          ],
+          "gold_root_pid": 2316,
+          "pred_has_root_claim": true,
+          "budget_timed_out": false
+        }
+      },
+      {
+        "scenario_id": "otrf_empire_mimikatz_extract_keys_benign_lsass",
+        "verdict_match": true,
+        "verdict_cost": 0,
+        "technique_precision": 0.0,
+        "technique_recall": 0.0,
+        "technique_f1": 0.0,
+        "root_hit": false,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 1.0,
+        "action_safe": true,
+        "has_acceptable_action": true,
+        "tool_calls": 15,
+        "llm_calls": 11,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "likely_benign",
+          "gold_verdict": "likely_benign",
+          "pre_repair_verdict": "likely_benign",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            428,
+            760,
+            1184,
+            704,
+            4564,
+            5960,
+            960,
+            6064
+          ],
+          "gold_key_pids": [
+            428
+          ],
+          "gold_root_pid": 428,
+          "pred_has_root_claim": false,
+          "budget_timed_out": false
+        }
+      },
+      {
+        "scenario_id": "otrf_empire_schtasks_creation_execution_elevated_user",
+        "verdict_match": true,
+        "verdict_cost": 0,
+        "technique_precision": 0.5,
+        "technique_recall": 1.0,
+        "technique_f1": 0.6666666666666666,
+        "root_hit": null,
+        "key_pid_recall": 1.0,
+        "persistence_recall": 1.0,
+        "citation_validity_pre": 1.0,
+        "citation_validity_post": 1.0,
+        "unsupported_claim_rate": 0.2222222222222222,
+        "action_safe": true,
+        "has_acceptable_action": true,
+        "tool_calls": 12,
+        "llm_calls": 12,
+        "tool_exhausted": false,
+        "llm_exhausted": false,
+        "verification_status": "degraded",
+        "details": {
+          "pred_verdict": "malicious",
+          "gold_verdict": "malicious",
+          "pre_repair_verdict": "malicious",
+          "repairs_used": 2,
+          "verification_status": "degraded",
+          "pred_involved_pids": [
+            4092,
+            7384
+          ],
+          "gold_key_pids": [],
+          "gold_root_pid": null,
+          "pred_has_root_claim": false,
+          "budget_timed_out": false
+        }
+      }
+    ]
+  }
+}
