@@ -2,10 +2,12 @@
 
 An investigation agent for EDR alerts. Given one alert and a window of host telemetry, it writes a case file: a verdict, the processes in scope, the ATT&CK techniques, and what a person should do next. Every claim cites an event the agent fetched on that run, and a deterministic verifier removes any claim it cannot back.
 
+It is built to assist an analyst, not replace one. The agent recommends and never acts: every recommended action waits for a person to approve or reject it, any claim can be disputed, and the analyst can re-run a case with what they know that the logs do not show.
+
 - **9 of 10** right verdicts on held-out cases with a local 7B model, up from 5 of 10 before technique grounding, and no recommended action the answer key forbids.
 - The hosted `gpt-5-mini` behind the live demo also gets **9 of 10** on the same cases.
 
-**[Live demo](https://alert2attack-demo.ashyisland-fb3eded8.italynorth.azurecontainerapps.io)**: open one of the four finished sample cases, or press Run investigation for a live run (about a minute, 20 a day).
+**[Live demo](https://alert2attack-demo.ashyisland-fb3eded8.italynorth.azurecontainerapps.io)**: open one of the four finished sample cases and approve, reject or dispute what the agent wrote, or press Run investigation for a live run (about a minute, 20 a day).
 
 ![A finished case file in the console: verdict, summary, citations, and the note that one unsupported claim was removed](docs/img/case.png)
 
@@ -18,6 +20,7 @@ This README is organised around the decisions: what was built, why, and what eac
 - [The problem](#the-problem)
 - [Results](#results)
 - [Architecture](#architecture)
+- [A person in the loop](#a-person-in-the-loop)
 - [Design decisions and what each one buys](#design-decisions-and-what-each-one-buys)
 - [Technique grounding, in detail](#technique-grounding-in-detail)
 - [How the experiments were run](#how-the-experiments-were-run)
@@ -33,7 +36,7 @@ Two failure modes make this hard to automate:
 - **A wrong action is expensive.** Isolating a host because a backup product touched LSASS takes a working machine off the network.
 - **A confident fake citation is worse than a slow human.** A general-purpose model given the raw log will cite events it never saw.
 
-So the system is built around two rules. The agent can only read telemetry through tools that record what they returned, and nothing it writes ships unless a program that is not a language model can trace it to that record. The agent recommends. A person decides. It never isolates a host or kills a process itself.
+So the system is built around two rules. The agent can only read telemetry through tools that record what they returned, and nothing it writes ships unless a program that is not a language model can trace it to that record. The agent recommends. A person decides. It never isolates a host or kills a process itself, and the console treats every recommended action as undecided until an analyst signs it off.
 
 It does not detect anything. Detection already fired; this is the step after.
 
@@ -120,6 +123,8 @@ flowchart TD
     V --> S[Safety rules: floor, thin window, LSASS ceiling]
     S --> O[Case file and trace]
     O --> C[Console: open any citation]
+    C --> H[Analyst: approve or reject actions, dispute claims]
+    H -.->|guided re-run: a hint, never evidence| P
 ```
 
 | Step | What happens | Model involved |
@@ -133,6 +138,26 @@ flowchart TD
 | Safety rules | Three deterministic checks on the verdict and the recommended actions | No |
 
 The answer key never enters the database the agent can query. That boundary is covered by tests, including one that scans every scenario over HTTP.
+
+## A person in the loop
+
+The goal is to help whoever reviews the alerts, not to close alerts without them. The agent writes a case file; a person decides what happens. The console gives that person four ways in, from the whole verdict down to a single line.
+
+| What the analyst does | Where | What happens |
+|---|---|---|
+| Approve or reject each recommended action | Under every action card | The action shows as pending until someone decides. A rejection needs a reason. The panel counts how many are decided, and nothing in the console is ever executed |
+| Dispute one claim | Under every timeline entry and technique | The dispute and its reason show next to the item. This corrects a detail, such as a process that is really the backup agent, without rejecting the verdict |
+| Agree or disagree with the verdict | The review panel | A disagreement names the verdict the case should have had |
+| Re-run with guidance | Under Run again | The analyst writes what they know that the telemetry does not show, and the agent runs again with it |
+
+Four rules keep this honest:
+
+- **The case file is never edited.** Every decision is a separate, append-only record next to it, so the file stays the record of what the agent said on that run. The latest decision per item is the one shown.
+- **A hint is guidance, not evidence.** It reaches the agent's plan fenced and labelled as the analyst's words. The verifier still accepts only ids the agent fetched, so a hint cannot be cited. The new case file says it was a guided run, quotes the hint, and links the run it follows.
+- **Disagreements are exported, never written into the dataset.** `GET /reviews/export` and `GET /feedback/export` return them for a person to curate. Letting the agent's own output become its answer key is the contamination the eval protocol exists to prevent.
+- **Evaluation never passes a hint.** The numbers in [Results](#results) are unguided runs, and a test checks that an unguided run's prompts contain no guidance.
+
+The API for all four is `POST /investigations/{id}/review`, `POST /investigations/{id}/feedback`, and `POST /investigations` with `guidance` and `follows_job_id`.
 
 ## Design decisions and what each one buys
 
@@ -193,6 +218,15 @@ Each row is a choice, the reason for it, and the evidence. Where a choice was no
 | A live stream of the run | A local 7B takes one to three minutes; waiting has to be legible | Server-sent events for each phase, tool call and rule |
 | A `replay` responder | A reviewer without a GPU can still drive the real tools, ledger and verifier | The console works with no model; replay is never used in evaluation |
 | A daily cap on live-model runs | A public demo spends real tokens on each run | Past the cap a run uses replay and the job records that it did |
+
+### Human oversight
+
+| Decision | Why | What it bought |
+|---|---|---|
+| Every action is pending until a person signs it off | A wrong containment takes a working machine off the network, and the agent is right 9 times in 10, not 10 | Nothing counts as decided by the agent alone. Not measured: no study of how analysts use it |
+| Disputes on single claims, not only on the verdict | Most disagreements are about a detail, and rejecting a right verdict over one wrong line loses information | A correction lands on the line it is about, with its reason |
+| Append-only decisions beside an unchanged case file | The case file is the only record of what the agent said | Decisions can change without rewriting history, and every one is kept |
+| A hint fenced as guidance, routed through the plan | An analyst knows things the logs do not, but a hint must not become a citation | The verifier still checks every claim against fetched evidence. Not measured: whether hints improve verdicts |
 
 ## Technique grounding, in detail
 
@@ -255,6 +289,7 @@ Each experiment is one hypothesis, one method, a measured result and a decision.
 - **Technique naming is still weak.** F1 of 0.45 means the agent still names wrong or missing techniques on most cases.
 - **Small samples.** 13 recorded test cases, 10 in the grounding pair. Enough to see a workflow failure, not enough for a confidence interval worth quoting.
 - **Single host, single alert.** No hunting across hosts, no alert ingestion from a real EDR, no multi-tenancy.
+- **The human loop is built, not measured.** No study of whether guided re-runs reach better verdicts, or of how analysts use sign-off. One operator account, no roles. The public demo keeps decisions in memory, and any visitor can click them.
 - **A prototype, not a product.** It is measured and it runs, and it is not hardened for a SOC.
 
 ## Run it
@@ -317,6 +352,7 @@ What it does:
 - A live trace while an investigation runs: the graph phase, each tool and model call as it happens, the evidence ledger filling up, and the graph levers. A lever that looked at the case and declined to act still shows up, because on a benign LSASS alert that is the interesting part.
 - Citations you can open. Click `ev-0042` in a claim and the console shows the telemetry event the agent fetched. Rule and ATT&CK citations open the rule or technique. A citation the run never fetched returns a 404 and is shown as unverifiable, since the verifier should already have stripped that claim.
 - A search page over ATT&CK techniques. Each hit shows which channel ranked it and where. See [Search](#search).
+- Sign-off, disputes, reviews and guided re-runs on every case. See [A person in the loop](#a-person-in-the-loop).
 
 Start the API, then the console:
 
@@ -334,10 +370,6 @@ The console is at <http://localhost:5173>. That port is the origin the API allow
 Press Run investigation on any case to run the `replay` model. It is a canned responder that does no reasoning. It exists so the live trace works on a checkout with no Ollama and no API key. The graph, the tools, the ledger, the verifier, and the levers around it are all real, and its output is deterministic, so a recording reproduces. Nothing measured in this README uses it: the eval runner cannot select it, and two tests hold that boundary. A replay run often ends degraded. The graph adds process ids to the scope after the write, and the verifier strips any whose `process_create` the run never fetched. That path does not depend on the model.
 
 No route returns the answer key. `tests/api/test_gold_boundary.py` matches raw response bodies against the gold field names, so a leak through a field nobody typed still fails. It was written before the first route.
-
-An analyst can agree or disagree with a case file and name the verdict it should have had. Reviews are append-only and never change the case file, which stays the record of what the agent said on that run. `GET /reviews/export` returns the disagreements as candidate eval cases for a person to curate. Nothing writes them into the dataset, because letting the agent's own output become its answer key is the contamination the eval protocol exists to prevent.
-
-A person stays in the loop at a finer grain too. The agent recommends and never acts, so every recommended action shows as pending until someone approves or rejects it, with a reason for a rejection; the panel counts how many are decided. Any timeline entry or technique can be disputed with a reason, which corrects a detail without rejecting the whole verdict. These decisions are stored beside the case file, append-only, and `GET /feedback/export` returns the rejections and disputes for curation. When the analyst knows something the telemetry does not show, such as that a process is the backup agent, they can re-run the case with that hint. It reaches the agent's plan fenced as guidance, never as evidence, so the verifier still only accepts fetched ids, and the case file says it was a guided run and which run it follows. Evaluation never passes a hint, so the measured numbers are unaffected.
 
 The API is open unless you configure sign-in, and it logs a warning at startup when it is. Set `CONSOLE_PASSWORD_HASH` to require a bearer token on the data routes (`/health`, `/metrics`, the sign-in route, and `/me` stay open). Make the hash with `uv run python -m alert2attack.api.auth`. This is demo-grade auth: one operator, one scrypt hash, HS256 tokens from PyJWT, no user table or roles. A real deployment would put the console behind the organisation's identity provider. The browser keeps the token in memory rather than `localStorage`, because the console renders command lines from telemetry that an attacker controls.
 
