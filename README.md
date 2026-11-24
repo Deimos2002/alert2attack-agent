@@ -2,7 +2,7 @@
 
 An investigation agent for endpoint security alerts. It takes one EDR alert and a boxed slice of host telemetry and writes a sourced case file: a verdict, the processes in scope, the ATT&CK techniques, and what a person should do next. Every claim cites evidence the agent fetched on that run, and a deterministic verifier removes any claim it cannot back.
 
-It runs on a local 7B model. On held-out cases it reaches the right verdict on 9 of 10, up from 5 of 10 before the latest change, without ever recommending an action the answer key forbids.
+It runs on a local 7B model. On held-out cases it reaches the right verdict on 9 of 10, up from 5 of 10 before the latest change, without ever recommending an action the answer key forbids. A hosted `gpt-5-mini`, the model behind the live demo, also gets 9 of 10 on the same cases.
 
 **[Live demo](https://alert2attack-demo.ashyisland-fb3eded8.italynorth.azurecontainerapps.io)**: open a case and press Run investigation. It runs on a hosted `gpt-5-mini` with technique grounding on, takes about a minute, and is capped at 20 live runs a day; past that it uses the scripted replay and says so. Four test cases open on sample runs of that same setup, so there is a finished case file to read before running anything: three verdicts match the answer key, and the Mimikatz case is called suspicious where the key says malicious. These demo samples are separate from the recorded evaluation runs below.
 
@@ -36,7 +36,15 @@ It does not detect anything. Detection already fired; this is the step after.
 
 ## Results
 
-Two sets of numbers, measured in different places. They are not comparable with each other, only within each table.
+Which model runs where:
+
+| Model | Where it runs | Used for |
+|---|---|---|
+| `qwen2.5:7b-instruct`, 7B parameters | Locally, served by Ollama | The product path, and the model the benchmarks below are built around |
+| `gpt-5-mini` (2025-08-07) | Azure OpenAI, EU Data Zone | The live demo, and the third table below. In the code it is the `teacher` model |
+| `replay` | No model | The offline console. Never used in evaluation |
+
+Three sets of numbers, measured in different places. Tables 1 and 2 are not comparable with each other; table 3 reruns table 2's held-out cases.
 
 **1. The recorded test, 13 held-out cases, cloud T4 GPU.** This is how the system got to its baseline.
 
@@ -72,6 +80,22 @@ What the five headline numbers mean:
 | Action safety | Share of cases with no recommended action the answer key forbids, such as isolating a benign host | Higher |
 
 Read the second table with its limits in mind: one run per arm, small samples, and 28 of the 33 scenarios (see [Technique grounding, in detail](#technique-grounding-in-detail)). The direction is consistent across dev and test; the exact figures will move on a re-run.
+
+**3. The same 10 held-out cases on the demo's hosted model.** Grounding on, one run each. The 7B column is the "On" test column above.
+
+| | Local 7B | `gpt-5-mini` |
+|---|---:|---:|
+| Verdict accuracy | 0.90 | 0.90 |
+| Mean cost of a wrong verdict | 0.30 | 0.30 |
+| Technique F1 | 0.45 | 0.45 |
+| Action safety | 1.00 | 1.00 |
+| Citations valid after verification | 1.00 | 1.00 |
+| Citations valid before verification | 0.88 | 1.00 |
+| Key-process recall | 0.75 | 1.00 |
+| Cases with an acceptable recommended action | 0.40 | 0.90 |
+| Tool calls per case | 9.5 | 12.7 |
+
+The hosted model does not get more verdicts right. Each model misses one real attack by answering "not enough evidence", and it is a different case each time: the logon-script persistence case for the 7B, the audit-policy change for `gpt-5-mini`. Where the hosted model is ahead is the rest of the case file: it names the key processes and recommends an acceptable action far more often, and it uses about a third more tool calls to get there. With 10 cases and one run, the tie on verdicts is the finding, not the decimals. Report: [`docs/experiments/2026-11-24-grounding-test-on-gpt5mini.json`](docs/experiments/2026-11-24-grounding-test-on-gpt5mini.json).
 
 ## Architecture
 
@@ -220,6 +244,7 @@ Each experiment is one hypothesis, one method, a measured result and a decision.
 | EXP-004 | Does one QLoRA run on the new graph beat the old 7B without hurting safety? | 0.54 accuracy, 0.77 cost, safety 1.00, confounded with the graph change |
 | EXP-005 | How much of that was the graph alone? | Accuracy and safety are the graph. The adapter is the cost cut and the extra process recall |
 | EXP-006 | Do evidence-grounded technique candidates fix the under-called attacks? | Dev 0.39 to 0.72 and held-out test 0.50 to 0.90, safety unchanged, on a 28-scenario subset |
+| EXP-007 | On the same 10 held-out cases, does the demo's hosted `gpt-5-mini` beat the local 7B? | Same verdict accuracy (0.90) and cost; better key-process recall (1.00 vs 0.75) and acceptable actions (0.90 vs 0.40), with more tool calls |
 
 ## What is not solved
 
