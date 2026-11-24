@@ -111,7 +111,7 @@ function CaseFileView({
           <p className="mt-3 max-w-[68ch] text-[15px] leading-relaxed text-text/90">{caseFile.summary}</p>
           <p className="mt-4 text-xs text-dim">
             {citations} citation{citations === 1 ? "" : "s"} · {caseFile.techniques.length} technique
-            {caseFile.techniques.length === 1 ? "" : "s"} · model <span className="mono">{job.model}</span> ·{" "}
+            {caseFile.techniques.length === 1 ? "" : "s"} · model <span className="mono">{job.model}</span> · run {job.created_at.slice(0, 10)} ·{" "}
             {verification ? (
               verification.status === "passed" ? (
                 <span className="text-benign">every citation verified</span>

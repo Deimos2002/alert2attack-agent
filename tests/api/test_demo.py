@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from alert2attack.api.app import create_app
-from alert2attack.api.jobs import InMemoryJobStore
+from alert2attack.api.jobs import InMemoryJobStore, load_recorded_runs
 from alert2attack.api.routes.investigations import DAILY_LIVE_RUNS_ENV, capped_model
 
 
@@ -59,3 +59,31 @@ def test_without_a_built_console_the_api_keeps_its_banner(monkeypatch: pytest.Mo
     client = TestClient(create_app())
     assert client.get("/").text.startswith("alert2attack api")
     assert client.get("/cases/some-case").status_code == 404
+
+
+RECORDED = Path(__file__).resolve().parents[2] / "datasets" / "demo" / "recorded_runs.json"
+
+
+def test_recorded_runs_ship_as_finished_cases_whose_citations_resolve(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ALERT2ATTACK_RECORDED_RUNS", str(RECORDED))
+    client = TestClient(create_app())
+
+    jobs = client.get("/investigations").json()
+    assert jobs and all(j["status"] == "succeeded" for j in jobs)
+    for job in jobs:
+        case_file = job["result"]["case_file"]
+        cited = {e for item in case_file["timeline"] + case_file["techniques"] for e in item["evidence"]}
+        cited |= {e for a in case_file["next_actions"] for e in a["rationale"]["evidence"]}
+        assert cited, f"{job['scenario_id']} cites nothing"
+        for evidence_id in cited:
+            assert client.get(f"/investigations/{job['id']}/evidence/{evidence_id}").status_code == 200
+
+
+def test_a_recorded_run_that_did_not_finish_is_refused(tmp_path: Path) -> None:
+    bad = tmp_path / "runs.json"
+    bad.write_text(
+        '[{"id": "x", "scenario_id": "otrf_empire_launcher_vbs", "model": "teacher", "status": "failed"}]',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="not a finished case file"):
+        load_recorded_runs(InMemoryJobStore(), bad)

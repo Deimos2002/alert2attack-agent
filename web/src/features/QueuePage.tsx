@@ -3,6 +3,9 @@ import { Link, useSearchParams } from "react-router-dom";
 import { EmptyState, ErrorBox, Panel, SeverityBadge, Skeleton, VerdictBadge, utc } from "../components/ui";
 import { api, type QueueFilters, type Severity, type Split, type Verdict } from "../lib/api";
 
+// The recorded case the intro points at: a real attack the agent called correctly.
+const FEATURED_CASE = "otrf_cmd_mshta_vbscript_execute_psh";
+
 function Stat({ label, value, tone = "text-text" }: { label: string; value: number | string; tone?: string }) {
   return (
     <div className="rounded-xl border border-edge bg-panel px-4 py-3">
@@ -59,7 +62,30 @@ export function QueuePage() {
 
   return (
     <div className="rise">
-      <header>
+      <Panel className="px-5 py-4">
+        <p className="max-w-3xl text-[15px] leading-relaxed text-text/90">
+          An investigation agent for EDR alerts. It reads one alert and a window of host telemetry, then
+          writes a verdict, the ATT&amp;CK techniques and next steps. A verifier removes every claim it
+          cannot tie to evidence the agent fetched on that run.
+        </p>
+        <p className="mt-2 max-w-3xl text-sm text-dim">
+          On 10 held-out cases a local 7B model reached the right verdict on 9 (one run, technique
+          grounding on). This demo runs a hosted <span className="mono">gpt-5-mini</span>; cases with a
+          verdict below are recorded runs of it, and Run investigation makes a fresh one.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {verdicts.has(FEATURED_CASE) ? (
+            <Link to={`/cases/${FEATURED_CASE}`} className="btn btn-primary">
+              Start here: a recorded investigation
+            </Link>
+          ) : null}
+          <a href="https://github.com/deimos2002/alert2attack-agent" className="btn" target="_blank" rel="noreferrer">
+            Source and results on GitHub
+          </a>
+        </div>
+      </Panel>
+
+      <header className="mt-8">
         <h1 className="text-2xl font-semibold tracking-tight">Alert queue</h1>
         <p className="mt-1 max-w-2xl text-sm text-dim">
           Each row is one alert on one host with a boxed window of telemetry. Open a case to run the
@@ -128,13 +154,13 @@ export function QueuePage() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[44rem] text-sm">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-edge text-left">
-                    <th className="label px-5 py-3">Severity</th>
+                    <th className="label px-3 py-3 sm:px-5">Severity</th>
                     <th className="label px-3 py-3">Alert</th>
-                    <th className="label px-3 py-3">Host</th>
-                    <th className="label px-3 py-3">Fired (UTC)</th>
+                    <th className="label hidden px-3 py-3 lg:table-cell">Host</th>
+                    <th className="label hidden px-3 py-3 lg:table-cell">Fired (UTC)</th>
                     <th className="label px-3 py-3">Verdict</th>
                     <th className="label px-5 py-3 text-right">Split</th>
                   </tr>
@@ -147,7 +173,7 @@ export function QueuePage() {
                         key={row.scenario_id}
                         className="group relative border-b border-edge/60 transition-colors duration-150 last:border-0 hover:bg-raised/70"
                       >
-                        <td className="px-5 py-3 align-top">
+                        <td className="px-3 py-3 align-top sm:px-5">
                           <SeverityBadge severity={row.severity} />
                         </td>
                         <td className="px-3 py-3">
@@ -158,10 +184,10 @@ export function QueuePage() {
                           >
                             {row.rule_title}
                           </Link>
-                          <div className="mono mt-0.5 text-[11px] text-dim">{row.scenario_id}</div>
+                          <div className="mono mt-0.5 break-all text-[11px] text-dim">{row.scenario_id}</div>
                         </td>
-                        <td className="mono px-3 py-3 align-top text-xs text-dim">{row.host}</td>
-                        <td className="mono px-3 py-3 align-top text-xs text-dim">{utc(row.fired_at)}</td>
+                        <td className="mono hidden px-3 py-3 align-top text-xs text-dim lg:table-cell">{row.host}</td>
+                        <td className="mono hidden px-3 py-3 align-top text-xs text-dim lg:table-cell">{utc(row.fired_at)}</td>
                         <td className="px-3 py-3 align-top">
                           {verdict ? <VerdictBadge verdict={verdict} /> : <span className="text-xs text-dim/70">Not run</span>}
                         </td>

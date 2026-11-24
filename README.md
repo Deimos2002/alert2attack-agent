@@ -4,7 +4,7 @@ An investigation agent for endpoint security alerts. It takes one EDR alert and 
 
 It runs on a local 7B model. On held-out cases it reaches the right verdict on 9 of 10, up from 5 of 10 before the latest change, without ever recommending an action the answer key forbids.
 
-**[Live demo](https://alert2attack-demo.ashyisland-fb3eded8.italynorth.azurecontainerapps.io)**: open a case and press Run investigation. It runs on a hosted `gpt-5-mini` with technique grounding on, takes about a minute, and is capped at 20 live runs a day; past that it uses the scripted replay and says so. The first load can take 10 to 30 seconds while the container starts.
+**[Live demo](https://alert2attack-demo.ashyisland-fb3eded8.italynorth.azurecontainerapps.io)**: open a case and press Run investigation. It runs on a hosted `gpt-5-mini` with technique grounding on, takes about a minute, and is capped at 20 live runs a day; past that it uses the scripted replay and says so. Four test cases open on recorded runs of that same setup, so there is a finished case file to read before running anything: three verdicts match the answer key, and the Mimikatz case is called suspicious where the key says malicious.
 
 Python, LangGraph, FastAPI, React and TypeScript · measured on [OTRF Security Datasets](https://github.com/OTRF/Security-Datasets) · [MIT](LICENSE)
 
@@ -293,6 +293,7 @@ The `Dockerfile` builds one image that serves the API and the built console from
 | `ALERT2ATTACK_WEB_DIST` | Folder holding the built console. Set in the image; unset, the API serves no pages. |
 | `ALERT2ATTACK_TEACHER_BASE_URL`, `ALERT2ATTACK_TEACHER_MODEL`, `OPENAI_API_KEY` | The live model: any OpenAI-compatible endpoint, for example an Azure OpenAI deployment's `/openai/v1`. |
 | `ALERT2ATTACK_DAILY_LIVE_RUNS` | Cap on live-model runs per UTC day. Past it, runs use `replay` and the job records that. Unset means no cap. |
+| `ALERT2ATTACK_RECORDED_RUNS` | A JSON file of finished runs to load at startup with their original ids and dates. The image points it at `datasets/demo/recorded_runs.json`, four live `gpt-5-mini` runs on test cases. |
 
 The cap is counted from the job store, so it resets if the store does. With the default in-memory store that means on every restart; set `ALERT2ATTACK_JOBS_DB` on a persistent volume if the cap has to hold across restarts.
 
