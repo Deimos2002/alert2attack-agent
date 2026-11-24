@@ -37,6 +37,9 @@ class CreateInvestigationRequest(BaseModel):
     scenario_id: str = Field(min_length=1)
     model: Literal["ollama", "local-7b", "openai", "teacher", "replay", "scripted"] = "ollama"
     sync: bool = False
+    # A guided re-run: a person's hint, and the run it follows.
+    guidance: str | None = Field(default=None, max_length=1000)
+    follows_job_id: str | None = None
 
 
 class InvestigationJobResponse(BaseModel):
@@ -77,6 +80,8 @@ def execute(
     job_id: str,
     scenario_id: str,
     model: str,
+    guidance: str | None = None,
+    follows_job_id: str | None = None,
 ) -> None:
     job = store.get(job_id)
     if job is None:
@@ -93,7 +98,10 @@ def execute(
             chat_factory=lambda _m: chat,
             investigation_id=job_id,
             progress=progress,
+            guidance=guidance,
         )
+        if guidance:
+            result["analyst_guidance"] = {"text": guidance, "follows_job_id": follows_job_id}
         job = store.get(job_id)
         if job is None:
             return
@@ -170,6 +178,11 @@ def create_investigation(
     injected: ChatFactoryInjectedDep,
 ) -> InvestigationJobResponse | JSONResponse:
     validate_model(body.model, chat_factory_injected=injected)
+    if body.follows_job_id is not None:
+        previous = get_job_or_404(store, body.follows_job_id)
+        if previous.scenario_id != body.scenario_id:
+            raise HTTPException(status_code=422, detail="follows_job_id is a run of a different case")
+    guidance = (body.guidance or "").strip() or None
     model = capped_model(body.model, store)
     job = store.create(scenario_id=body.scenario_id, model=model)
     # Created here, not in execute: the client gets the job id back and
@@ -178,14 +191,16 @@ def create_investigation(
     hub.create(job.id)
 
     if body.sync:
-        execute(store, hub, resolve_chat, job.id, body.scenario_id, model)
+        execute(store, hub, resolve_chat, job.id, body.scenario_id, model, guidance, body.follows_job_id)
         done = store.get(job.id)
         assert done is not None
         if done.status == "failed":
             raise HTTPException(status_code=400, detail=done.error or "investigation failed")
         return JSONResponse(status_code=200, content=job_response(done).model_dump(mode="json"))
 
-    background_tasks.add_task(execute, store, hub, resolve_chat, job.id, body.scenario_id, model)
+    background_tasks.add_task(
+        execute, store, hub, resolve_chat, job.id, body.scenario_id, model, guidance, body.follows_job_id
+    )
     return JSONResponse(status_code=202, content=job_response(job).model_dump(mode="json"))
 
 

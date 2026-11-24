@@ -44,8 +44,10 @@ class Investigator:
         max_repairs: int = 2,
         progress: ProgressSink | None = None,
         retriever: Retriever | None = None,
+        guidance: str | None = None,
     ) -> None:
         self.llm = llm
+        self.guidance = guidance
         self.registry = registry or default_registry()
         self.knowledge = knowledge or KnowledgeBase.load_default()
         self.budget = budget or Budget()
@@ -81,6 +83,7 @@ class Investigator:
             max_repairs=self.max_repairs,
             progress=emitter,
             retriever=self.retriever,
+            guidance=self.guidance,
         ).build()
         turn_cap = self.max_investigate_turns if self.max_investigate_turns > 0 else 256
         state = run_graph(built, recursion_limit=turn_cap + self.max_repairs * 2 + 8)

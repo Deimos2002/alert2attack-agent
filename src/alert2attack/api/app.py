@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 
 from alert2attack.api.auth import AuthConfig, auth_config_from_env
 from alert2attack.api.factory import ChatFactory, default_chat_factory
+from alert2attack.api.feedback import FeedbackStore, InMemoryFeedbackStore, SqliteFeedbackStore
 from alert2attack.api.jobs import InMemoryJobStore, JobStore, SqliteJobStore, load_recorded_runs
 from alert2attack.api.progress_hub import ProgressHub
 from alert2attack.api.reviews import InMemoryReviewStore, ReviewStore, SqliteReviewStore
@@ -69,11 +70,17 @@ def default_review_store() -> ReviewStore:
     return SqliteReviewStore(db_path) if db_path else InMemoryReviewStore()
 
 
+def default_feedback_store() -> FeedbackStore:
+    db_path = os.environ.get("ALERT2ATTACK_JOBS_DB")
+    return SqliteFeedbackStore(db_path) if db_path else InMemoryFeedbackStore()
+
+
 def create_app(
     *,
     chat_factory: ChatFactory | None = None,
     job_store: JobStore | None = None,
     review_store: ReviewStore | None = None,
+    feedback_store: FeedbackStore | None = None,
     auth_config: AuthConfig | None = None,
     retriever: Retriever | None = None,
 ) -> FastAPI:
@@ -89,6 +96,7 @@ def create_app(
     if recorded:
         load_recorded_runs(app.state.job_store, recorded)
     app.state.review_store = review_store or default_review_store()
+    app.state.feedback_store = feedback_store or default_feedback_store()
     app.state.progress_hub = ProgressHub()
     app.state.auth_config = auth_config or auth_config_from_env()
     app.state.chat_factory = chat_factory or default_chat_factory

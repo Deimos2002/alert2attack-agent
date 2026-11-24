@@ -120,6 +120,8 @@ export type EventPage = Schemas["EventPage"];
 export type EvidenceResolution = Schemas["EvidenceResolution"];
 export type Review = Schemas["Review"];
 export type ReviewRequest = Schemas["ReviewRequest"];
+export type ItemFeedback = Schemas["ItemFeedback"];
+export type FeedbackRequest = Schemas["FeedbackRequest"];
 
 export interface Claim {
   text: string;
@@ -172,6 +174,8 @@ export interface InvestigationJob extends Omit<Schemas["InvestigationJobResponse
       }[];
       notes: string[];
     };
+    /** Present only on a guided re-run. */
+    analyst_guidance?: { text: string; follows_job_id: string | null };
   } | null;
 }
 
@@ -283,11 +287,16 @@ export const api = {
    * Start a run. `replay` is the canned responder — it needs no model and is
    * the only option that works on a machine without Ollama.
    */
-  startInvestigation: (scenarioId: string, model: AgentModel = "replay") =>
+  startInvestigation: (
+    scenarioId: string,
+    model: AgentModel = "replay",
+    guided?: { guidance: string; follows_job_id: string },
+  ) =>
     post<InvestigationJob>("/investigations", {
       scenario_id: scenarioId,
       model,
       sync: false,
+      ...guided,
     }),
 
   investigation: (jobId: string) => get<InvestigationJob>(`/investigations/${encodeURIComponent(jobId)}`),
@@ -315,4 +324,9 @@ export const api = {
 
   addReview: (jobId: string, body: ReviewRequest) =>
     post<Review>(`/investigations/${encodeURIComponent(jobId)}/review`, body),
+
+  feedback: (jobId: string) => get<ItemFeedback[]>(`/investigations/${encodeURIComponent(jobId)}/feedback`),
+
+  addFeedback: (jobId: string, body: FeedbackRequest) =>
+    post<ItemFeedback>(`/investigations/${encodeURIComponent(jobId)}/feedback`, body),
 };

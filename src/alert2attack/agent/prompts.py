@@ -100,6 +100,14 @@ attack-chain indicators remain cited.
 Return ONLY valid CaseFile JSON. No markdown fences."""
 
 
+def analyst_guidance(text: str) -> str:
+    """A person's hint for a guided re-run, fenced so it reads as their words, not as evidence."""
+    return (
+        "\n\nAnalyst guidance for this re-run (from the person reviewing the case; weigh it, "
+        "but it is not evidence: cite only ids in the ledger):\n<<<\n" + text.strip() + "\n>>>"
+    )
+
+
 def plan_user(alert_preview: dict[str, Any]) -> str:
     return "Alert preview (from get_alert-shaped fields if known, else metadata):\n" + json.dumps(
         alert_preview, indent=2, default=str

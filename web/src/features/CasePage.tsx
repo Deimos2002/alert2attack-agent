@@ -16,6 +16,7 @@ import {
 import { api, type AgentModel, type CaseFile, type InvestigationJob } from "../lib/api";
 import { useInvestigationStream } from "../lib/useInvestigationStream";
 import { EvidenceDrawer } from "./EvidenceDrawer";
+import { ActionDecision, ClaimDispute, useItemFeedback } from "./ItemFeedback";
 import { ReviewForm } from "./ReviewForm";
 import { TraceView } from "./TraceView";
 
@@ -97,6 +98,9 @@ function CaseFileView({
     ...caseFile.techniques.flatMap((t) => t.evidence),
     ...caseFile.next_actions.flatMap((a) => a.rationale.evidence),
   ]).size;
+  const feedback = useItemFeedback(job.id);
+  const decided = caseFile.next_actions.filter((_, i) => feedback.latest.has(`next_actions/${i}`)).length;
+  const guidance = job.result?.analyst_guidance;
 
   return (
     <div className="rise space-y-4">
@@ -129,17 +133,26 @@ function CaseFileView({
             {verification.repairs_used} repair turn(s). They were removed from this case file, not shipped.
           </div>
         ) : null}
+        {guidance ? (
+          <div className="border-t border-accent/30 bg-accent/10 px-6 py-3 text-sm text-text/90">
+            Guided re-run. The analyst's hint was given to the agent as guidance, not as evidence:{" "}
+            <q className="italic">{guidance.text}</q>
+          </div>
+        ) : null}
       </Panel>
 
       {caseFile.next_actions.length > 0 ? (
         <Panel>
-          <SectionTitle aside="Nothing here is executed">Recommended actions</SectionTitle>
+          <SectionTitle aside={`${decided} of ${caseFile.next_actions.length} decided · nothing here is executed`}>
+            Recommended actions
+          </SectionTitle>
           <ul className="grid gap-3 px-5 pb-5 sm:grid-cols-2">
             {caseFile.next_actions.map((a, i) => (
               <li key={i} className="rounded-lg border border-edge bg-raised/50 p-4">
                 <div className="text-sm font-semibold">{sentence(a.action)}</div>
                 <p className="mt-1 text-sm leading-relaxed text-dim">{a.rationale.text}</p>
                 <EvidenceChips ids={a.rationale.evidence} onOpen={onOpenEvidence} />
+                <ActionDecision target={`next_actions/${i}`} feedback={feedback} />
               </li>
             ))}
           </ul>
@@ -160,6 +173,7 @@ function CaseFileView({
                   {entry.ts.startsWith("1970") ? null : <time className="mono text-xs text-dim">{utc(entry.ts)}</time>}
                   <p className="mt-0.5 text-sm leading-relaxed">{entry.text}</p>
                   <EvidenceChips ids={entry.evidence} onOpen={onOpenEvidence} />
+                  <ClaimDispute target={`timeline/${i}`} feedback={feedback} />
                 </div>
               </li>
             ))}
@@ -171,13 +185,14 @@ function CaseFileView({
         <Panel>
           <SectionTitle>ATT&amp;CK techniques</SectionTitle>
           <ul className="px-5 pb-4">
-            {caseFile.techniques.map((t) => (
+            {caseFile.techniques.map((t, i) => (
               <li key={t.technique_id} className="border-b border-edge/50 py-3 last:border-0">
                 <div className="flex flex-wrap items-baseline gap-x-3">
                   <span className="mono text-sm font-medium text-text">{t.technique_id}</span>
                   {t.note ? <span className="text-sm text-dim">{t.note}</span> : null}
                 </div>
                 <EvidenceChips ids={t.evidence} onOpen={onOpenEvidence} />
+                <ClaimDispute target={`techniques/${i}`} feedback={feedback} />
               </li>
             ))}
           </ul>
@@ -332,9 +347,11 @@ export function CasePage() {
   });
 
   const start = useMutation({
-    mutationFn: () => api.startInvestigation(scenarioId, AGENT_MODEL),
+    mutationFn: (guided?: { guidance: string; follows_job_id: string }) =>
+      api.startInvestigation(scenarioId, AGENT_MODEL, guided),
     onSuccess: (job) => setLiveJobId(job.id),
   });
+  const [guidance, setGuidance] = useState("");
 
   // Prefer the run happening now; otherwise the latest finished one.
   const finished = jobs?.find((j) => j.scenario_id === scenarioId && j.status === "succeeded");
@@ -382,7 +399,7 @@ export function CasePage() {
                 title="This alert has not been investigated yet."
                 hint="Run the investigation to get a verdict, a timeline and recommended actions, each tied to evidence you can open."
                 action={
-                  <button type="button" className="btn btn-primary" disabled={start.isPending} onClick={() => start.mutate()}>
+                  <button type="button" className="btn btn-primary" disabled={start.isPending} onClick={() => start.mutate(undefined)}>
                     Run investigation
                   </button>
                 }
@@ -398,7 +415,7 @@ export function CasePage() {
             <button
               type="button"
               disabled={running || start.isPending}
-              onClick={() => start.mutate()}
+              onClick={() => start.mutate(undefined)}
               className="btn w-full"
             >
               {running ? "Investigating…" : job?.result ? "Run again" : "Run investigation"}
@@ -409,6 +426,35 @@ export function CasePage() {
                 : "Runs on a live model, up to a daily limit. Past the limit, a scripted replay stands in and the case file says so."}{" "}
               The tools, evidence ledger, citation verifier and safety rules around it are the real ones.
             </p>
+            {job?.result ? (
+              <form
+                className="mt-4 border-t border-edge pt-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (guidance.trim()) start.mutate({ guidance: guidance.trim(), follows_job_id: job.id });
+                }}
+              >
+                <label htmlFor="guidance" className="text-sm font-semibold">
+                  Re-run with your guidance
+                </label>
+                <p className="mt-1 text-xs leading-relaxed text-dim">
+                  Tell the agent what you know that the telemetry does not show. It is weighed as a hint, never cited as
+                  evidence, and the run is marked as guided.
+                </p>
+                <textarea
+                  id="guidance"
+                  value={guidance}
+                  onChange={(e) => setGuidance(e.target.value)}
+                  maxLength={1000}
+                  rows={3}
+                  placeholder="e.g. VBoxService is the hypervisor agent on this host; ignore its LSASS access"
+                  className="field mt-2 min-h-0 w-full py-2"
+                />
+                <button type="submit" className="btn mt-2 w-full" disabled={running || start.isPending || !guidance.trim()}>
+                  Re-run with guidance
+                </button>
+              </form>
+            ) : null}
           </Panel>
 
           {liveJobId ? <TraceView trace={trace} /> : null}

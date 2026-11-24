@@ -29,6 +29,7 @@ from alert2attack.agent.prompts import (
     PLAN_SYSTEM,
     REPAIR_SYSTEM,
     WRITE_SYSTEM,
+    analyst_guidance,
     investigate_user,
     plan_user,
     repair_user,
@@ -129,8 +130,11 @@ class InvestigationGraph:
         max_repairs: int = _MAX_REPAIRS,
         progress: ProgressEmitter | None = None,
         retriever: Retriever | None = None,
+        guidance: str | None = None,
     ) -> None:
         self.llm = llm
+        # Only the API's guided re-run sets this; eval never does, so measured runs are unchanged.
+        self.guidance = (guidance or "").strip() or None
         # None keeps the graph the frozen OTRF rows were measured on: no ground step.
         self.retriever = retriever
         self.registry = registry
@@ -210,6 +214,10 @@ class InvestigationGraph:
             plan = (resp.content or "").strip() or (
                 "1. Review alert\n2. Inspect process tree\n3. Search related events"
             )
+        if self.guidance:
+            # Riding on the plan carries the hint into the investigate and write prompts.
+            plan += analyst_guidance(self.guidance)
+            self.trace.add_note("plan: analyst guidance applied")
         return {
             "plan": plan,
             "alert_preview": preview,

@@ -69,6 +69,7 @@ def run_investigation(
     chat_factory: ChatFactory | None = None,
     investigation_id: str | None = None,
     progress: ProgressSink | None = None,
+    guidance: str | None = None,
 ) -> dict[str, Any]:
     structlog.contextvars.bind_contextvars(investigation_id=investigation_id or "sync", scenario_id=scenario_id)
     log.info("investigation.start", model=model)
@@ -81,6 +82,7 @@ def run_investigation(
         budget=budget_from_env(),
         max_investigate_turns=max_investigate_turns_from_env(),
         progress=progress,
+        guidance=guidance,
     ).run_scenario(scenario)
     payload = result_payload(result)
     llm_ms = sum(c.duration_ms for c in result.trace.llm_calls)
