@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 
 from alert2attack.api.auth import AuthConfig, auth_config_from_env
 from alert2attack.api.factory import ChatFactory, default_chat_factory
-from alert2attack.api.jobs import InMemoryJobStore, JobStore, SqliteJobStore
+from alert2attack.api.jobs import InMemoryJobStore, JobStore, SqliteJobStore, load_recorded_runs
 from alert2attack.api.progress_hub import ProgressHub
 from alert2attack.api.reviews import InMemoryReviewStore, ReviewStore, SqliteReviewStore
 from alert2attack.api.routes import auth, investigations, reviews, scenarios, search, system
@@ -84,6 +84,10 @@ def create_app(
         version="0.1.0",
     )
     app.state.job_store = job_store or default_job_store()
+    # The demo image ships a few finished live runs so a visitor sees a case file at once.
+    recorded = os.environ.get("ALERT2ATTACK_RECORDED_RUNS")
+    if recorded:
+        load_recorded_runs(app.state.job_store, recorded)
     app.state.review_store = review_store or default_review_store()
     app.state.progress_hub = ProgressHub()
     app.state.auth_config = auth_config or auth_config_from_env()

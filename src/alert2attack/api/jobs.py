@@ -25,6 +25,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from alert2attack.domain.scenario import SCENARIOS_ROOT
+
 JobStatus = Literal["queued", "running", "succeeded", "failed"]
 
 
@@ -54,6 +56,10 @@ class JobStore(Protocol):
 
     def list(self, *, limit: int = 50) -> list[InvestigationJob]: ...
 
+    def put(self, job: InvestigationJob) -> None:
+        """Store a job exactly as given, timestamps included (recorded demo runs)."""
+        ...
+
 
 class InMemoryJobStore:
     def __init__(self) -> None:
@@ -79,6 +85,10 @@ class InMemoryJobStore:
         with self._lock:
             jobs = sorted(self._jobs.values(), key=lambda j: j.created_at, reverse=True)
             return jobs[:limit]
+
+    def put(self, job: InvestigationJob) -> None:
+        with self._lock:
+            self._jobs[job.id] = job
 
 
 _JOBS_SCHEMA = """
@@ -172,6 +182,23 @@ class SqliteJobStore:
             ).fetchall()
         return [_row_to_job(row) for row in rows]
 
+    def put(self, job: InvestigationJob) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO jobs (id, scenario_id, model, status, created_at,"
+                " updated_at, error, result_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    job.id,
+                    job.scenario_id,
+                    job.model,
+                    job.status,
+                    job.created_at,
+                    job.updated_at,
+                    job.error,
+                    json.dumps(job.result) if job.result is not None else None,
+                ),
+            )
+
     def fail_stale_running(self) -> int:
         """Mark jobs orphaned by a restart as failed. Returns how many.
 
@@ -185,3 +212,21 @@ class SqliteJobStore:
                 ("interrupted by an API restart", datetime.now(UTC).isoformat()),
             )
         return int(cur.rowcount)
+
+
+def load_recorded_runs(store: JobStore, path: str | Path) -> int:
+    """Put finished runs recorded from the live demo into ``store``. Returns how many.
+
+    They keep their original ids and timestamps, so they read as the past runs
+    they are and never count toward today's live-run cap. Anything that is not a
+    succeeded run of a known scenario is refused, so a bad file fails at startup.
+    """
+    runs = json.loads(Path(path).read_text(encoding="utf-8"))
+    for run in runs:
+        job = InvestigationJob(**run)
+        if job.status != "succeeded" or not job.result or "case_file" not in job.result:
+            raise ValueError(f"recorded run {job.id} is not a finished case file")
+        if not (SCENARIOS_ROOT / job.scenario_id).is_dir():
+            raise ValueError(f"recorded run {job.id} names unknown scenario {job.scenario_id!r}")
+        store.put(job)
+    return len(runs)

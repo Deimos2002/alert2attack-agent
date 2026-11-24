@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from alert2attack.api.app import create_app, default_job_store
-from alert2attack.api.jobs import InMemoryJobStore, JobStore, SqliteJobStore
+from alert2attack.api.jobs import InMemoryJobStore, InvestigationJob, JobStore, SqliteJobStore
 
 
 @pytest.fixture(params=["memory", "sqlite"])
@@ -179,3 +179,19 @@ def test_fail_stale_running_is_idempotent(tmp_path: Path) -> None:
     assert store_.fail_stale_running() == 1
     assert store_.fail_stale_running() == 0
     store_.close()
+
+
+def test_put_keeps_the_job_exactly_as_given(store: JobStore) -> None:
+    job = InvestigationJob(
+        id="recorded-1",
+        scenario_id="a",
+        model="teacher",
+        status="succeeded",
+        created_at="2001-01-01T00:00:00+00:00",
+        updated_at="2001-01-01T00:01:00+00:00",
+        result={"case_file": {"verdict": "malicious"}},
+    )
+    store.put(job)
+    got = store.get("recorded-1")
+    assert got is not None
+    assert (got.created_at, got.updated_at, got.result) == (job.created_at, job.updated_at, job.result)
