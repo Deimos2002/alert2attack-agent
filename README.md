@@ -1,10 +1,13 @@
 # alert2attack
 
-An investigation agent for endpoint security alerts. It takes one EDR alert and a boxed slice of host telemetry and writes a sourced case file: a verdict, the processes in scope, the ATT&CK techniques, and what a person should do next. Every claim cites evidence the agent fetched on that run, and a deterministic verifier removes any claim it cannot back.
+An investigation agent for EDR alerts. Given one alert and a window of host telemetry, it writes a case file: a verdict, the processes in scope, the ATT&CK techniques, and what a person should do next. Every claim cites an event the agent fetched on that run, and a deterministic verifier removes any claim it cannot back.
 
-It runs on a local 7B model. On held-out cases it reaches the right verdict on 9 of 10, up from 5 of 10 before the latest change, without ever recommending an action the answer key forbids. A hosted `gpt-5-mini`, the model behind the live demo, also gets 9 of 10 on the same cases.
+- **9 of 10** right verdicts on held-out cases with a local 7B model, up from 5 of 10 before technique grounding, and no recommended action the answer key forbids.
+- The hosted `gpt-5-mini` behind the live demo also gets **9 of 10** on the same cases.
 
-**[Live demo](https://alert2attack-demo.ashyisland-fb3eded8.italynorth.azurecontainerapps.io)**: open a case and press Run investigation. It runs on a hosted `gpt-5-mini` with technique grounding on, takes about a minute, and is capped at 20 live runs a day; past that it uses the scripted replay and says so. Four test cases open on sample runs of that same setup, so there is a finished case file to read before running anything: three verdicts match the answer key, and the Mimikatz case is called suspicious where the key says malicious. These demo samples are separate from the recorded evaluation runs below.
+**[Live demo](https://alert2attack-demo.ashyisland-fb3eded8.italynorth.azurecontainerapps.io)**: open one of the four finished sample cases, or press Run investigation for a live run (about a minute, 20 a day).
+
+![A finished case file in the console: verdict, summary, citations, and the note that one unsupported claim was removed](docs/img/case.png)
 
 Python, LangGraph, FastAPI, React and TypeScript · measured on [OTRF Security Datasets](https://github.com/OTRF/Security-Datasets) · [MIT](LICENSE)
 
@@ -19,7 +22,7 @@ This README is organised around the decisions: what was built, why, and what eac
 - [Technique grounding, in detail](#technique-grounding-in-detail)
 - [How the experiments were run](#how-the-experiments-were-run)
 - [What is not solved](#what-is-not-solved)
-- [Quickstart](#quickstart) · [Console](#console) · [For engineers](#for-engineers)
+- [Run it](#run-it) · [Console](#console) · [Search](#search) · [Repo map](#repo-map)
 
 ## The problem
 
@@ -44,6 +47,16 @@ Which model runs where:
 | `gpt-5-mini` (2025-08-07) | Azure OpenAI, EU Data Zone | The live demo, and the third table below. In the code it is the `teacher` model |
 | `replay` | No model | The offline console. Never used in evaluation |
 
+What the headline numbers mean:
+
+| Number | Plain meaning | Better is |
+|---|---|---|
+| Verdict accuracy | Share of cases where the verdict matches the answer key | Higher |
+| Mean cost | How bad the misses are, averaged over every case. A right verdict costs 0. Calling a real attack "likely benign" costs 5, "not enough evidence" 3, "suspicious" 1; calling a benign case malicious costs 2 | Lower |
+| Citations valid | Share of citations that are real ids fetched on that run | Higher |
+| Key-process recall | Whether the processes that matter were named | Higher |
+| Action safety | Share of cases with no recommended action the answer key forbids, such as isolating a benign host | Higher |
+
 Three sets of numbers, measured in different places. Tables 1 and 2 are not comparable with each other; table 3 reruns table 2's held-out cases.
 
 **1. The recorded test, 13 held-out cases, cloud T4 GPU.** This is how the system got to its baseline.
@@ -62,22 +75,12 @@ Three sets of numbers, measured in different places. Tables 1 and 2 are not comp
 |---|---:|---:|---:|---:|
 | | Off | On | Off | On |
 | Verdict accuracy | 0.39 | **0.72** | 0.50 | **0.90** |
-| Mean cost of a wrong verdict | 1.94 | **0.61** | 1.30 | **0.30** |
+| Mean verdict cost | 1.94 | **0.61** | 1.30 | **0.30** |
 | Technique F1 | 0.04 | **0.27** | 0.05 | **0.45** |
 | Action safety | 1.00 | 1.00 | 1.00 | 1.00 |
 | Citations valid after verification | 1.00 | 1.00 | 1.00 | 1.00 |
 | Key-process recall | 0.89 | 0.83 | **1.00** | 0.75 |
 | Tool calls per case | 5.9 | 10.5 | 5.5 | 9.5 |
-
-What the five headline numbers mean:
-
-| Number | Plain meaning | Better is |
-|---|---|---|
-| Verdict accuracy | Share of cases where the verdict matches the answer key | Higher |
-| Mean cost | How bad a miss is. Calling a real attack "likely benign" costs 5, "not enough evidence" 3, "suspicious" 1 | Lower |
-| Citations valid | Share of citations that are real ids fetched on that run | Higher |
-| Key-process recall | Whether the processes that matter were named | Higher |
-| Action safety | Share of cases with no recommended action the answer key forbids, such as isolating a benign host | Higher |
 
 Read the second table with its limits in mind: one run per arm, small samples, and 28 of the 33 scenarios (see [Technique grounding, in detail](#technique-grounding-in-detail)). The direction is consistent across dev and test; the exact figures will move on a re-run.
 
@@ -86,7 +89,7 @@ Read the second table with its limits in mind: one run per arm, small samples, a
 | | Local 7B | `gpt-5-mini` |
 |---|---:|---:|
 | Verdict accuracy | 0.90 | 0.90 |
-| Mean cost of a wrong verdict | 0.30 | 0.30 |
+| Mean verdict cost | 0.30 | 0.30 |
 | Technique F1 | 0.45 | 0.45 |
 | Action safety | 1.00 | 1.00 |
 | Citations valid after verification | 1.00 | 1.00 |
@@ -140,8 +143,8 @@ Each row is a choice, the reason for it, and the evidence. Where a choice was no
 | Decision | Why | What it bought |
 |---|---|---|
 | Tools only, no raw log in the prompt | A model handed the whole window cites events that are not there | Against a single prompt on the 13-case test: citation validity 0.98 to 1.00, key-process recall 0.42 to 0.46 on the first version and 0.85 with the graph rules |
-| An evidence ledger as the only source of ids | Makes "did the agent actually see this?" a lookup | Citations valid after verification are 1.00 on every agent row in both tables |
-| A deterministic verifier with repair, then strip | A fabricated citation must not ship clean, and a model cannot be the judge of its own citations | Before verification 12 to 17% of citations were invalid in the latest test runs (0.83 to 0.88 valid); after it, none |
+| An evidence ledger as the only source of ids | Makes "did the agent actually see this?" a lookup | Citations valid after verification are 1.00 on every agent row in all three tables |
+| A deterministic verifier with repair, then strip | A fabricated citation must not ship clean, and a model cannot be the judge of its own citations | With the local 7B, 12 to 17% of citations were invalid before verification on the held-out grounding runs (0.84 to 0.88 valid); after it, none. `gpt-5-mini` started at 1.00 |
 | Degraded is a visible state | An analyst should know when claims were removed | The console shows how many claims were stripped and after how many repair turns |
 
 ### Verdict and safety
@@ -168,7 +171,7 @@ Each row is a choice, the reason for it, and the evidence. Where a choice was no
 
 | Decision | Why | What it bought |
 |---|---|---|
-| A local 7B model as the product path | Telemetry stays on the machine and a run costs nothing per token | Matches a larger cloud model on verdict accuracy (0.54 each) on the recorded test |
+| A local 7B model as the product path | Telemetry stays on the machine and a run costs nothing per token | Matches a larger cloud model on verdict accuracy (0.54 each) on the recorded test, and the demo's `gpt-5-mini` (0.90 each) on the grounding test |
 | One QLoRA adapter, trained on dev traces only | To learn whether training adds anything the graph does not | Mean cost 1.85 to 0.77 and key-process recall 0.85 to 0.96. Accuracy did not move |
 | A control run without the adapter | The adapter was trained after the graph changed, so its gain was confounded | Showed accuracy and safety came from the graph, and cost and recall from the adapter |
 | No rank or learning-rate sweep, no 14B default, no synthetic training events | Each would have added runs without answering an open question | Recorded as rejected ideas in the experiment log |
@@ -221,7 +224,7 @@ It is about 80 lines in [`technique_grounding.py`](src/alert2attack/agent/techni
 
 On dev, six cases flipped to correct and none the other way; one already-wrong case got a costlier wrong verdict.
 
-**What it costs.** About four more tool calls per case (the lookups), and key-process recall fell on test from 1.00 to 0.75. I have not yet found out why the write step names fewer processes when it has technique candidates in front of it; that is the next thing to look at.
+**What it costs.** About four more tool calls per case (the lookups), and key-process recall fell on test from 1.00 to 0.75. I have not yet found out why the write step names fewer processes when it has technique candidates in front of it. It looks tied to the model: `gpt-5-mini` with the same candidates keeps key-process recall at 1.00 (table 3).
 
 **Limits of this measurement.**
 
@@ -254,25 +257,54 @@ Each experiment is one hypothesis, one method, a measured result and a decision.
 - **Single host, single alert.** No hunting across hosts, no alert ingestion from a real EDR, no multi-tenancy.
 - **A prototype, not a product.** It is measured and it runs, and it is not hardened for a SOC.
 
-## Quickstart
+## Run it
 
-Reviewers without a GPU or API key can run the offline path:
+Offline, with no GPU and no API key (scripted model):
 
 ```bash
 uv sync
 uv run pytest
 uv run alert2attack scenarios list
-uv run alert2attack investigate otrf_empire_launcher_vbs \
-  --model scripted --responses-json path/to/responses.json
+uv run alert2attack tool get_alert --scenario otrf_empire_launcher_vbs
+uv run alert2attack investigate otrf_empire_launcher_vbs   --model scripted --responses-json path/to/responses.json
 ```
 
-Optional live local 7B (Ollama `qwen2.5:7b-instruct`):
+With the local 7B (Ollama `qwen2.5:7b-instruct`; set `ALERT2ATTACK_OLLAMA_MODEL=casefile-qlora-n14` for the QLoRA adapter):
 
 ```bash
 uv run alert2attack investigate otrf_empire_launcher_vbs --model ollama
 ```
 
-Eval smoke and the full CLI live in [`docs/RUN.md`](docs/RUN.md).
+With the hosted model, set `OPENAI_API_KEY` (or `EXPLABS_API_KEY`) and `ALERT2ATTACK_TEACHER_MODEL`, plus `ALERT2ATTACK_TEACHER_BASE_URL` for Azure OpenAI, then pass `--model teacher`.
+
+Evaluate. Reports land in the gitignored `reports/`. The metric module is frozen: do not change `metrics.py`.
+
+```bash
+./scripts/smoke_eval.sh --split test --limit 1
+./scripts/smoke_eval.sh --live local --split test --limit 3
+uv run alert2attack eval run --arm agent-teacher --split test
+uv run python scripts/render_eval_table.py reports
+```
+
+Serve on localhost only:
+
+```bash
+uv run alert2attack serve --host 127.0.0.1 --port 8000
+# or the API plus Ollama:
+docker compose up --build
+```
+
+Compose publishes the API on `127.0.0.1:8000` and Ollama on `127.0.0.1:11434`; do not expose those ports on a public interface. It keeps job records and reviews in a named volume so a case link survives a restart, and the train group is not in the image. Without `CONSOLE_PASSWORD_HASH` the API has no inbound auth, so treat it as a laptop demo. Only the hosted model needs an API key, and that key is outbound.
+
+Checks, as CI runs them:
+
+```bash
+uv run ruff check . && uv run mypy
+npm --prefix web run typecheck && npm --prefix web run build
+uv sync --group retrieval && uv run python -m alert2attack.retrieval.bench --embedder fastembed
+```
+
+The full CLI is in [`docs/RUN.md`](docs/RUN.md) and the training extras (`uv sync --group train`) in [`docs/TRAIN.md`](docs/TRAIN.md).
 
 ## Console
 
@@ -299,7 +331,7 @@ npm --prefix web run dev
 
 The console is at <http://localhost:5173>. That port is the origin the API allows by default; set `ALERT2ATTACK_CORS_ORIGINS` to change it.
 
-Press Investigate on any case to run the `replay` model. It is a canned responder that does no reasoning. It exists so the live trace works on a checkout with no Ollama and no API key. The graph, the tools, the ledger, the verifier, and the levers around it are all real, and its output is deterministic, so a recording reproduces. Nothing measured in this README uses it: the eval runner cannot select it, and two tests hold that boundary. A replay run often ends degraded. The graph adds process ids to the scope after the write, and the verifier strips any whose `process_create` the run never fetched. That path does not depend on the model.
+Press Run investigation on any case to run the `replay` model. It is a canned responder that does no reasoning. It exists so the live trace works on a checkout with no Ollama and no API key. The graph, the tools, the ledger, the verifier, and the levers around it are all real, and its output is deterministic, so a recording reproduces. Nothing measured in this README uses it: the eval runner cannot select it, and two tests hold that boundary. A replay run often ends degraded. The graph adds process ids to the scope after the write, and the verifier strips any whose `process_create` the run never fetched. That path does not depend on the model.
 
 No route returns the answer key. `tests/api/test_gold_boundary.py` matches raw response bodies against the gold field names, so a leak through a field nobody typed still fails. It was written before the first route.
 
@@ -318,7 +350,7 @@ The `Dockerfile` builds one image that serves the API and the built console from
 | `ALERT2ATTACK_WEB_DIST` | Folder holding the built console. Set in the image; unset, the API serves no pages. |
 | `ALERT2ATTACK_TEACHER_BASE_URL`, `ALERT2ATTACK_TEACHER_MODEL`, `OPENAI_API_KEY` | The live model: any OpenAI-compatible endpoint, for example an Azure OpenAI deployment's `/openai/v1`. |
 | `ALERT2ATTACK_DAILY_LIVE_RUNS` | Cap on live-model runs per UTC day. Past it, runs use `replay` and the job records that. Unset means no cap. |
-| `ALERT2ATTACK_RECORDED_RUNS` | A JSON file of finished runs to load at startup with their original ids and dates. The image points it at `datasets/demo/recorded_runs.json`: four live `gpt-5-mini` demo samples on test cases, not part of any evaluation. |
+| `ALERT2ATTACK_RECORDED_RUNS` | A JSON file of finished runs to load at startup with their original ids and dates. The image points it at `datasets/demo/recorded_runs.json`: four live `gpt-5-mini` demo samples on test cases, not part of any evaluation. Three verdicts match the answer key; the Mimikatz credential dump is called suspicious where the key says malicious. |
 
 The cap is counted from the job store, so it resets if the store does. With the default in-memory store that means on every restart; set `ALERT2ATTACK_JOBS_DB` on a persistent volume if the cap has to hold across restarts.
 
@@ -339,16 +371,6 @@ ALERT2ATTACK_EMBEDDER=fastembed uv run alert2attack serve --host 127.0.0.1 --por
 
 Qdrant runs in memory or embedded on disk by default. `ALERT2ATTACK_QDRANT` accepts a server URL too, but that path is untested because the development machine has no Docker.
 
-## Serve locally (localhost only)
-
-```bash
-uv run alert2attack serve --host 127.0.0.1 --port 8000
-# or
-docker compose up --build
-```
-
-Compose publishes the API on `127.0.0.1:8000` and Ollama on `127.0.0.1:11434`. Do not expose those ports on a public interface. Compose keeps job records and reviews in a named volume so a case link survives a restart. Without `CONSOLE_PASSWORD_HASH` the API has no inbound auth, so bind loopback and treat it as a laptop demo. Only the teacher and OpenAI models need `EXPLABS_API_KEY` or `OPENAI_API_KEY`, and those are outbound credentials.
-
 ## Repo map
 
 | If you want... | Open |
@@ -364,30 +386,7 @@ Compose publishes the API on `127.0.0.1:8000` and Ollama on `127.0.0.1:11434`. D
 | Design spec | [`docs/design/2026-09-09-edr-investigation-agent-design.md`](docs/design/2026-09-09-edr-investigation-agent-design.md) |
 | The 33 OTRF scenarios | [`datasets/scenarios/`](datasets/scenarios/), [`datasets/catalog.yaml`](datasets/catalog.yaml), [`datasets/AUTHORING.md`](datasets/AUTHORING.md) |
 
-## For engineers
-
-Install, CLI, eval protocol, API, and rebuild: [`docs/RUN.md`](docs/RUN.md). Train extras: [`docs/TRAIN.md`](docs/TRAIN.md) (`uv sync --group train`). Do not change `metrics.py`.
-
-```bash
-uv sync
-uv run alert2attack scenarios list
-uv run alert2attack dataset list
-uv run alert2attack tool get_alert --scenario otrf_empire_launcher_vbs
-uv run alert2attack investigate otrf_empire_launcher_vbs --model ollama
-uv run alert2attack investigate otrf_empire_launcher_vbs --model scripted --responses-json path/to/responses.json
-./scripts/smoke_eval.sh --split test --limit 1
-./scripts/smoke_eval.sh --live local --split test --limit 3
-uv run python scripts/render_eval_table.py reports
-uv run alert2attack serve --host 127.0.0.1 --port 8000   # or: docker compose up --build
-uv run pytest
-uv run ruff check . && uv run mypy
-npm --prefix web run typecheck && npm --prefix web run build
-uv sync --group retrieval && uv run python -m alert2attack.retrieval.bench --embedder fastembed
-```
-
-Local 7B is Ollama `qwen2.5:7b-instruct`, or set `ALERT2ATTACK_OLLAMA_MODEL=casefile-qlora-n14`. Teacher live eval needs `EXPLABS_API_KEY` or `OPENAI_API_KEY`. `docker compose up --build` serves the API on loopback only (the train group is not in the image).
-
-Layout:
+### Code layout
 
 - `src/alert2attack/domain`: Pydantic models (events, alert, scenario, evidence ids). No I/O.
 - `src/alert2attack/store`: SQLite `CaseStore`; refuses to load gold labels.
@@ -406,6 +405,7 @@ Layout:
 - `reports/`: eval JSON/Markdown outputs (gitignored).
 - `datasets/scenarios/<id>/`: `manifest.yaml` + `events.jsonl` (OTRF-only real telemetry).
 - `tests/fixtures/scenarios/`: synthetic cases for unit tests only (not part of the dataset).
+
 
 ## License
 
