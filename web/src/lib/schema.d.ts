@@ -311,6 +311,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/investigations/{job_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Feedback */
+        get: operations["list_feedback_investigations__job_id__feedback_get"];
+        put?: never;
+        /**
+         * Add Feedback
+         * @description Approve or reject one recommended action, or dispute one claim.
+         *
+         *     The case file is not changed. The latest decision on an item is the one shown.
+         */
+        post: operations["add_feedback_investigations__job_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/feedback/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Feedback
+         * @description Rejected actions and disputed claims, latest decision per item, for a person to curate.
+         */
+        get: operations["export_feedback_feedback_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -341,6 +384,10 @@ export interface components {
              * @default false
              */
             sync: boolean;
+            /** Guidance */
+            guidance?: string | null;
+            /** Follows Job Id */
+            follows_job_id?: string | null;
         };
         /**
          * EvalCaseCandidate
@@ -452,6 +499,21 @@ export interface components {
             rule?: components["schemas"]["SigmaRule"] | null;
             technique?: components["schemas"]["AttackTechnique"] | null;
         };
+        /** FeedbackRequest */
+        FeedbackRequest: {
+            /** Target */
+            target: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approve" | "reject" | "dispute";
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -500,6 +562,30 @@ export interface components {
             created_at: string;
             /** Updated At */
             updated_at: string;
+        };
+        /** ItemFeedback */
+        ItemFeedback: {
+            /** Id */
+            id: string;
+            /** Job Id */
+            job_id: string;
+            /** Scenario Id */
+            scenario_id: string;
+            /** Target */
+            target: string;
+            /** Item Text */
+            item_text: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approve" | "reject" | "dispute";
+            /** Reason */
+            reason: string;
+            /** Reviewer */
+            reviewer: string;
+            /** Created At */
+            created_at: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1223,6 +1309,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_feedback_investigations__job_id__feedback_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemFeedback"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_feedback_investigations__job_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemFeedback"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_feedback_feedback_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemFeedback"][];
                 };
             };
         };

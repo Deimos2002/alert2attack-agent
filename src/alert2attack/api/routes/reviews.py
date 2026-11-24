@@ -1,4 +1,4 @@
-"""Analyst reviews of case files (append-only; see ``alert2attack.api.reviews``)."""
+"""Analyst input on case files: whole-file reviews and per-item decisions (both append-only)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from alert2attack.api.auth import Operator, require_operator
-from alert2attack.api.deps import JobStoreDep, ReviewStoreDep
+from alert2attack.api.deps import FeedbackStoreDep, JobStoreDep, ReviewStoreDep
+from alert2attack.api.feedback import (
+    FeedbackRequest,
+    InvalidFeedback,
+    ItemFeedback,
+    build_feedback,
+    export_disagreements,
+)
 from alert2attack.api.reviews import (
     EvalCaseCandidate,
     Review,
@@ -76,3 +83,47 @@ def export_reviews(
     protocol exists to prevent.
     """
     return export_candidates(reviews.list(limit=limit))
+
+
+@router.post("/investigations/{job_id}/feedback", response_model=ItemFeedback, status_code=201)
+def add_feedback(
+    job_id: str,
+    body: FeedbackRequest,
+    store: JobStoreDep,
+    feedback: FeedbackStoreDep,
+    caller: Annotated[Operator | None, Depends(require_operator)] = None,
+) -> ItemFeedback:
+    """Approve or reject one recommended action, or dispute one claim.
+
+    The case file is not changed. The latest decision on an item is the one shown.
+    """
+    job = get_job_or_404(store, job_id)
+    if job.result is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"investigation is {job.status}; there is no case file to give feedback on",
+        )
+    try:
+        row = build_feedback(
+            job_id=job_id,
+            scenario_id=job.scenario_id,
+            case_file=job.result.get("case_file", {}),
+            request=body,
+            reviewer=caller.username if caller else "anonymous",
+        )
+    except InvalidFeedback as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    feedback.add(row)
+    return row
+
+
+@router.get("/investigations/{job_id}/feedback", response_model=list[ItemFeedback])
+def list_feedback(job_id: str, store: JobStoreDep, feedback: FeedbackStoreDep) -> list[ItemFeedback]:
+    get_job_or_404(store, job_id)
+    return feedback.list(job_id=job_id)
+
+
+@router.get("/feedback/export", response_model=list[ItemFeedback])
+def export_feedback(feedback: FeedbackStoreDep) -> list[ItemFeedback]:
+    """Rejected actions and disputed claims, latest decision per item, for a person to curate."""
+    return export_disagreements(feedback.list(limit=5000))

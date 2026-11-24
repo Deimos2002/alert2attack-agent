@@ -12,6 +12,7 @@ from fastapi import Depends, Request
 
 from alert2attack.api.auth import AuthConfig
 from alert2attack.api.factory import ChatFactory
+from alert2attack.api.feedback import FeedbackStore
 from alert2attack.api.jobs import JobStore
 from alert2attack.api.progress_hub import ProgressHub
 from alert2attack.api.reviews import ReviewStore
@@ -25,6 +26,11 @@ def job_store(request: Request) -> JobStore:
 
 def review_store(request: Request) -> ReviewStore:
     store: ReviewStore = request.app.state.review_store
+    return store
+
+
+def feedback_store(request: Request) -> FeedbackStore:
+    store: FeedbackStore = request.app.state.feedback_store
     return store
 
 
@@ -62,6 +68,7 @@ def retriever(request: Request) -> Retriever:
 
 JobStoreDep = Annotated[JobStore, Depends(job_store)]
 ReviewStoreDep = Annotated[ReviewStore, Depends(review_store)]
+FeedbackStoreDep = Annotated[FeedbackStore, Depends(feedback_store)]
 ProgressHubDep = Annotated[ProgressHub, Depends(progress_hub)]
 AuthConfigDep = Annotated[AuthConfig, Depends(auth_config)]
 ChatFactoryDep = Annotated[ChatFactory, Depends(chat_factory)]
