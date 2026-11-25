@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -73,6 +74,7 @@ def run_investigation(
 ) -> dict[str, Any]:
     structlog.contextvars.bind_contextvars(investigation_id=investigation_id or "sync", scenario_id=scenario_id)
     log.info("investigation.start", model=model)
+    started = time.monotonic()
     factory = chat_factory or default_chat_factory
     llm = factory(model)
     scenario = load_scenario(root / scenario_id)
@@ -101,6 +103,13 @@ def run_investigation(
         "investigation.done",
         verdict=result.case_file.verdict.value,
         verification_status=status,
+        model=result.trace.model,
+        duration_ms=round((time.monotonic() - started) * 1000),
+        llm_ms=round(llm_ms),
+        llm_calls=len(result.trace.llm_calls),
         tool_calls=result.trace.budget.get("tool_calls"),
+        budget_hit=any(result.trace.budget.get(k) for k in ("tool_exhausted", "llm_exhausted", "timed_out")),
+        verification_errors=sorted({e.code for e in result.verification.errors}) if result.verification else [],
+        guided=guidance is not None,
     )
     return payload

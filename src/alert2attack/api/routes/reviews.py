@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from alert2attack.api.auth import Operator, require_operator
@@ -24,6 +25,7 @@ from alert2attack.api.reviews import (
 )
 from alert2attack.api.routes.investigations import get_job_or_404
 
+log = structlog.get_logger("alert2attack.api")
 router = APIRouter(dependencies=[Depends(require_operator)])
 
 
@@ -59,6 +61,11 @@ def add_review(
         reviewer=caller.username if caller else "anonymous",
     )
     reviews.add(review)
+    # The note is free text: only its length is logged.
+    log.info("review.added", investigation_id=job_id, scenario_id=review.scenario_id,
+             agent_verdict=review.agent_verdict, agrees=review.agrees,
+             corrected_verdict=review.corrected_verdict, reviewer=review.reviewer,
+             note_len=len(review.note))
     return review
 
 
@@ -114,6 +121,8 @@ def add_feedback(
     except InvalidFeedback as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     feedback.add(row)
+    log.info("feedback.added", investigation_id=job_id, scenario_id=row.scenario_id, target=row.target,
+             decision=row.decision, reviewer=row.reviewer, reason_len=len(row.reason))
     return row
 
 

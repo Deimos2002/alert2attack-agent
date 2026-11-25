@@ -6,6 +6,7 @@ import os
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -30,6 +31,7 @@ from alert2attack.api.progress_hub import ProgressHub
 from alert2attack.api.service import run_investigation
 from alert2attack.api.sse import event_stream, parse_last_event_id
 
+log = structlog.get_logger("alert2attack.api")
 router = APIRouter(prefix="/investigations", dependencies=[Depends(require_operator)])
 
 
@@ -113,6 +115,8 @@ def execute(
         # is one authoritative representation of it.
         progress.emit(DoneEvent(job_id=job_id))
     except Exception as exc:  # noqa: BLE001 — surface as job failure
+        # Without this line a failed run was visible only in the job store, never in the logs.
+        log.exception("investigation.failed", investigation_id=job_id, scenario_id=scenario_id, model=model)
         progress.emit(ErrorEvent(message=str(exc)))
         job = store.get(job_id)
         if job is None:
