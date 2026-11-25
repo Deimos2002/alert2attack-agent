@@ -6,6 +6,7 @@ This module only wires things together: it builds the stores, puts them on
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -93,8 +94,11 @@ def create_app(
     app.state.job_store = job_store or default_job_store()
     # The demo image ships a few finished live runs so a visitor sees a case file at once.
     recorded = os.environ.get("ALERT2ATTACK_RECORDED_RUNS")
+    app.state.public_job_ids = set()
     if recorded:
         load_recorded_runs(app.state.job_store, recorded)
+        # The only runs a visitor may list when ADMIN_TOKEN is set.
+        app.state.public_job_ids = {run["id"] for run in json.loads(Path(recorded).read_text(encoding="utf-8"))}
     app.state.review_store = review_store or default_review_store()
     app.state.feedback_store = feedback_store or default_feedback_store()
     app.state.progress_hub = ProgressHub()

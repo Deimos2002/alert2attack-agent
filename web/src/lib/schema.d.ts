@@ -153,7 +153,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Investigations */
+        /**
+         * List Investigations
+         * @description Every run, for the admin. With ADMIN_TOKEN set, anyone else gets only the recorded
+         *     sample runs: other visitors' runs stay private, and the console adds the visitor's own
+         *     runs by id (GET /investigations/{id} stays open; ids are random UUIDs).
+         */
         get: operations["list_investigations_investigations_get"];
         put?: never;
         /** Create Investigation */
@@ -1031,7 +1036,9 @@ export interface operations {
             query?: {
                 limit?: number;
             };
-            header?: never;
+            header?: {
+                "x-admin-token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };

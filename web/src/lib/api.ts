@@ -206,6 +206,29 @@ export class ApiError extends Error {
  */
 let bearerToken: string | null = null;
 
+/**
+ * Ids of the runs this browser started. Unlike the bearer token these are not
+ * credentials worth stealing: a run id only opens that one case file.
+ */
+const MY_RUNS_KEY = "alert2attack.myRuns";
+
+function myRuns(): string[] {
+  try {
+    const ids: unknown = JSON.parse(localStorage.getItem(MY_RUNS_KEY) ?? "[]");
+    return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberRun(id: string): void {
+  try {
+    localStorage.setItem(MY_RUNS_KEY, JSON.stringify([id, ...myRuns().filter((x) => x !== id)].slice(0, 50)));
+  } catch {
+    // Private mode or blocked storage: the run still shows while the page is open.
+  }
+}
+
 export function setBearerToken(token: string | null): void {
   bearerToken = token;
 }
@@ -281,7 +304,22 @@ export const api = {
     return get<EventPage>(`/scenarios/${encodeURIComponent(id)}/events?${params.toString()}`);
   },
 
-  investigations: (limit = 50) => get<InvestigationJob[]>(`/investigations?limit=${limit}`),
+  /**
+   * On the public demo the server lists only the recorded sample runs, so this
+   * adds the runs this browser started, fetched one by one by id.
+   */
+  investigations: async (limit = 50) => {
+    const listed = await get<InvestigationJob[]>(`/investigations?limit=${limit}`);
+    const seen = new Set(listed.map((j) => j.id));
+    const mine = await Promise.all(
+      myRuns()
+        .filter((id) => !seen.has(id))
+        .map((id) => get<InvestigationJob>(`/investigations/${encodeURIComponent(id)}`).catch(() => null)),
+    );
+    return [...listed, ...mine.filter((j): j is InvestigationJob => j !== null)]
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, limit);
+  },
 
   /**
    * Start a run. `replay` is the canned responder — it needs no model and is
@@ -297,6 +335,9 @@ export const api = {
       model,
       sync: false,
       ...guided,
+    }).then((job) => {
+      rememberRun(job.id);
+      return job;
     }),
 
   investigation: (jobId: string) => get<InvestigationJob>(`/investigations/${encodeURIComponent(jobId)}`),
