@@ -7,12 +7,12 @@ from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from alert2attack.agent.progress import DoneEvent, ErrorEvent
-from alert2attack.api.auth import require_operator
+from alert2attack.api.auth import admin_restricted, require_operator
 from alert2attack.api.deps import (
     ChatFactoryDep,
     ChatFactoryInjectedDep,
@@ -215,9 +215,17 @@ def get_investigation(job_id: str, store: JobStoreDep) -> InvestigationJobRespon
 
 @router.get("", response_model=list[InvestigationJobResponse])
 def list_investigations(
+    request: Request,
     store: JobStoreDep,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    x_admin_token: Annotated[str | None, Header()] = None,
 ) -> list[InvestigationJobResponse]:
+    """Every run, for the admin. With ADMIN_TOKEN set, anyone else gets only the recorded
+    sample runs: other visitors' runs stay private, and the console adds the visitor's own
+    runs by id (GET /investigations/{id} stays open; ids are random UUIDs)."""
+    if admin_restricted(x_admin_token):
+        samples = [j for i in request.app.state.public_job_ids if (j := store.get(i)) is not None]
+        return [job_response(j) for j in sorted(samples, key=lambda j: j.created_at, reverse=True)[:limit]]
     return [job_response(j) for j in store.list(limit=limit)]
 
 

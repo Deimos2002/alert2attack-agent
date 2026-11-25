@@ -227,6 +227,12 @@ def require_operator(
 ADMIN_TOKEN_ENV = "ADMIN_TOKEN"
 
 
+def admin_restricted(x_admin_token: str | None) -> bool:
+    """True when ADMIN_TOKEN is set and the request does not carry it in X-Admin-Token."""
+    expected = os.environ.get(ADMIN_TOKEN_ENV, "")
+    return bool(expected) and not hmac.compare_digest((x_admin_token or "").encode(), expected.encode())
+
+
 def require_admin_token(x_admin_token: Annotated[str | None, Header()] = None) -> None:
     """Reviewer data and metrics on a public deployment.
 
@@ -234,8 +240,7 @@ def require_admin_token(x_admin_token: Annotated[str | None, Header()] = None) -
     console sign-in requires; its own header keeps it apart from the operator's bearer
     token. Unset, nothing changes, so local runs and scrapers keep working.
     """
-    expected = os.environ.get(ADMIN_TOKEN_ENV, "")
-    if expected and not hmac.compare_digest((x_admin_token or "").encode(), expected.encode()):
+    if admin_restricted(x_admin_token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="admin token required")
 
 

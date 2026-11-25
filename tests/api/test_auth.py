@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import jwt
 import pytest
@@ -18,6 +21,7 @@ from alert2attack.api.auth import (
     verify_password,
 )
 from alert2attack.api.factory import ChatFactory
+from alert2attack.api.jobs import InMemoryJobStore
 
 PASSWORD = "correct horse battery staple"
 SECRET = "test-secret-not-used-anywhere-real"
@@ -237,6 +241,7 @@ def test_issue_token_respects_the_configured_ttl(enabled_auth: AuthConfig) -> No
     assert issue_token(short, username="analyst").expires_in == 300
 
 
+SAMPLE_SCENARIO = "otrf_empire_launcher_vbs"
 ADMIN_ONLY = ("/metrics", "/reviews", "/reviews/export", "/feedback/export")
 
 
@@ -250,3 +255,27 @@ def test_admin_token_closes_reviewer_data_and_metrics(monkeypatch: pytest.Monkey
     # The demo's own pages stay open.
     assert client.get("/health").status_code == 200
     assert client.get("/scenarios").status_code == 200
+
+
+def test_visitors_list_only_the_sample_runs_when_admin_token_is_set(
+    scripted_factory: ChatFactory, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # A finished run, saved the way the demo image ships its recorded sample runs.
+    store = InMemoryJobStore()
+    seed = TestClient(create_app(chat_factory=scripted_factory, job_store=store))
+    sample = seed.post("/investigations", json={"scenario_id": SAMPLE_SCENARIO, "model": "scripted", "sync": True})
+    recorded = tmp_path / "recorded_runs.json"
+    recorded.write_text(json.dumps([asdict(store.get(sample.json()["id"]))]), encoding="utf-8")
+
+    monkeypatch.setenv("ALERT2ATTACK_RECORDED_RUNS", str(recorded))
+    monkeypatch.setenv("ADMIN_TOKEN", "s3cret-admin")
+    client = TestClient(create_app(chat_factory=scripted_factory))
+    visitor_run = client.post(
+        "/investigations", json={"scenario_id": SAMPLE_SCENARIO, "model": "scripted", "sync": True}
+    ).json()["id"]
+
+    assert [j["id"] for j in client.get("/investigations").json()] == [sample.json()["id"]]
+    admin = client.get("/investigations", headers={"X-Admin-Token": "s3cret-admin"}).json()
+    assert {j["id"] for j in admin} == {sample.json()["id"], visitor_run}
+    # A visitor still opens their own run by its id.
+    assert client.get(f"/investigations/{visitor_run}").status_code == 200
