@@ -7,7 +7,7 @@ from typing import Annotated
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from alert2attack.api.auth import Operator, require_operator
+from alert2attack.api.auth import Operator, require_admin_token, require_operator
 from alert2attack.api.deps import FeedbackStoreDep, JobStoreDep, ReviewStoreDep
 from alert2attack.api.feedback import (
     FeedbackRequest,
@@ -69,7 +69,7 @@ def add_review(
     return review
 
 
-@router.get("/reviews", response_model=list[Review])
+@router.get("/reviews", response_model=list[Review], dependencies=[Depends(require_admin_token)])
 def list_reviews(
     reviews: ReviewStoreDep,
     scenario_id: Annotated[str | None, Query()] = None,
@@ -78,7 +78,7 @@ def list_reviews(
     return reviews.list(scenario_id=scenario_id, limit=limit)
 
 
-@router.get("/reviews/export", response_model=list[EvalCaseCandidate])
+@router.get("/reviews/export", response_model=list[EvalCaseCandidate], dependencies=[Depends(require_admin_token)])
 def export_reviews(
     reviews: ReviewStoreDep,
     limit: Annotated[int, Query(ge=1, le=500)] = 500,
@@ -132,7 +132,7 @@ def list_feedback(job_id: str, store: JobStoreDep, feedback: FeedbackStoreDep) -
     return feedback.list(job_id=job_id)
 
 
-@router.get("/feedback/export", response_model=list[ItemFeedback])
+@router.get("/feedback/export", response_model=list[ItemFeedback], dependencies=[Depends(require_admin_token)])
 def export_feedback(feedback: FeedbackStoreDep) -> list[ItemFeedback]:
     """Rejected actions and disputed claims, latest decision per item, for a person to curate."""
     return export_disagreements(feedback.list(limit=5000))

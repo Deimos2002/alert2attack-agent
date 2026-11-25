@@ -29,7 +29,7 @@ from typing import Annotated, Any
 
 import jwt
 import structlog
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -222,6 +222,21 @@ def require_operator(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return decode_token(config, credentials.credentials)
+
+
+ADMIN_TOKEN_ENV = "ADMIN_TOKEN"
+
+
+def require_admin_token(x_admin_token: Annotated[str | None, Header()] = None) -> None:
+    """Reviewer data and metrics on a public deployment.
+
+    With ADMIN_TOKEN set, these routes need it in X-Admin-Token, on top of whatever the
+    console sign-in requires; its own header keeps it apart from the operator's bearer
+    token. Unset, nothing changes, so local runs and scrapers keep working.
+    """
+    expected = os.environ.get(ADMIN_TOKEN_ENV, "")
+    if expected and not hmac.compare_digest((x_admin_token or "").encode(), expected.encode()):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="admin token required")
 
 
 def _main() -> int:

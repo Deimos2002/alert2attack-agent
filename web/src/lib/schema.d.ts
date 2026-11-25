@@ -822,7 +822,9 @@ export interface operations {
     metrics_metrics_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "x-admin-token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -835,6 +837,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1256,7 +1267,9 @@ export interface operations {
                 scenario_id?: string | null;
                 limit?: number;
             };
-            header?: never;
+            header?: {
+                "x-admin-token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1287,7 +1300,9 @@ export interface operations {
             query?: {
                 limit?: number;
             };
-            header?: never;
+            header?: {
+                "x-admin-token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1382,7 +1397,9 @@ export interface operations {
     export_feedback_feedback_export_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "x-admin-token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1395,6 +1412,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemFeedback"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

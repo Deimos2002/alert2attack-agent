@@ -235,3 +235,18 @@ def test_me_discloses_nothing_beyond_whether_auth_is_on(secured: TestClient) -> 
 def test_issue_token_respects_the_configured_ttl(enabled_auth: AuthConfig) -> None:
     short = enabled_auth.model_copy(update={"ttl_minutes": 5})
     assert issue_token(short, username="analyst").expires_in == 300
+
+
+ADMIN_ONLY = ("/metrics", "/reviews", "/reviews/export", "/feedback/export")
+
+
+def test_admin_token_closes_reviewer_data_and_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ADMIN_TOKEN", "s3cret-admin")
+    client = TestClient(create_app())
+    for path in ADMIN_ONLY:
+        assert client.get(path).status_code == 401, path
+        assert client.get(path, headers={"X-Admin-Token": "wrong"}).status_code == 401, path
+        assert client.get(path, headers={"X-Admin-Token": "s3cret-admin"}).status_code == 200, path
+    # The demo's own pages stay open.
+    assert client.get("/health").status_code == 200
+    assert client.get("/scenarios").status_code == 200
